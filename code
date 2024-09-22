@@ -1,0 +1,71 @@
+import os
+import base64
+import cv2
+import numpy as np
+from openai import OpenAI as OPENAI
+from langchain.indexes import GraphIndexCreator
+from langchain.chains import GraphQAChain
+from docx import Document
+
+apikey = "insert your api key"
+
+# Function to create graph from regulations and analyze video frame-by-frame
+def networkx_graph(regulations, video_frame_exp):
+    os.environ["OPENAI_API_KEY"] = apikey
+    index_creator = GraphIndexCreator(llm=OpenAI(temperature=0.7))
+    
+    # Prompt to extract knowledge triples from regulations
+    triples_prompt = """You are a networked intelligence... Output:"""
+    baseprompt = PromptTemplate(input_variables=["text"], template=triples_prompt)
+    graph = index_creator.from_text(regulations, prompt=baseprompt)
+    
+    # Graph QA Chain for video analysis
+    qa_prompt = PromptTemplate(input_variables=['context', 'question'], template="""Use the following knowledge triplets...""")
+    chain = GraphQAChain.from_llm(OpenAI(temperature=0.7), graph=graph, qa_prompt=qa_prompt)
+    
+    graphqa_prompt = "Please interpret the situation of the video..."
+    response_with_reg = chain.run(graphqa_prompt)
+    return response_with_reg
+
+# Function to generate images from base64 frames
+def make_frames_to_one_image(base64Frames):
+    selected_frames = base64Frames[0::50]  # Sample frames for analysis
+    decoded_frames = []
+    
+    for base64_frame in selected_frames:
+        img_data = base64.b64decode(base64_frame)
+        np_arr = np.frombuffer(img_data, dtype=np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        img = cv2.resize(img, (200, 200))
+        decoded_frames.append(img)
+    
+    concatenated_image = np.vstack(decoded_frames)
+    cv2.imwrite("./data/annotated_frames.jpg", concatenated_image)
+    return concatenated_image
+
+# Save results to DOCX file
+def to_docx_file(video_frame_exp, response_with_reg):
+    doc = Document()
+    doc.add_heading('Video Analysis Report', level=1)
+    doc.add_paragraph(video_frame_exp)
+    doc.add_heading('Regulation Based Insights', level=1)
+    doc.add_paragraph(response_with_reg)
+    doc.save('./data/Opinion.docx')
+
+# Main function for processing video input and regulations
+def main(video_input, regulations):
+    video = cv2.VideoCapture(video_input)
+    base64Frames = []
+    
+    while video.isOpened():
+        success, frame = video.read()
+        if not success:
+            break
+        _, buffer = cv2.imencode(".jpg", frame)
+        base64Frames.append(base64.b64encode(buffer).decode("utf-8"))
+
+    video.release()
+    video_frame_exp = "Frame by frame explanation of video..."
+    response_with_reg = networkx_graph(regulations, video_frame_exp)
+    image = make_frames_to_one_image(base64Frames)
+    return image, video_frame_exp, response_with_reg
