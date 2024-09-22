@@ -25,7 +25,7 @@ def networkx_graph(regulations, video_frame_exp):
     
     graphqa_prompt = "Please interpret the situation of the video..."
     response_with_reg = chain.run(graphqa_prompt)
-    return response_with_reg
+    return response_with_rag
 
 # Function to generate images from base64 frames
 def make_frames_to_one_image(base64Frames):
@@ -36,7 +36,7 @@ def make_frames_to_one_image(base64Frames):
         img_data = base64.b64decode(base64_frame)
         np_arr = np.frombuffer(img_data, dtype=np.uint8)
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        img = cv2.resize(img, (200, 200))
+        img = cv2.resize(img, (768, 768))
         decoded_frames.append(img)
     
     concatenated_image = np.vstack(decoded_frames)
@@ -68,4 +68,4 @@ def main(video_input, regulations):
     video_frame_exp = "Frame by frame explanation of video..."
     response_with_reg = networkx_graph(regulations, video_frame_exp)
     image = make_frames_to_one_image(base64Frames)
-    return image, video_frame_exp, response_with_reg
+    return image, video_frame_exp, response_with_rag
